@@ -7,6 +7,9 @@ library(gplots)
 library(ggpubr)
 library(tidyverse)
 library(maxstat)
+library(ggforce)
+library(grid)
+library(gridExtra)
 options(scipen = 999)
 options(readr.default_locale=readr::locale(tz="US/Eastern"))
 
@@ -221,7 +224,7 @@ results.long <- melt(results.wide)
 tmp <- subset(results.long, variable == c('AUROC', 'ACCURACY'))
 tmp <- unique(tmp[,c('variable','SEX')])
 tmp$CRITERIA <- tmp$value <- 1
-tiff('fig.2.tiff', units = "in", width = 14, height = 8, res = 300, compression = 'jpeg')
+tiff('fig.2.tiff', units = "in", width = 16, height = 8, res = 300, compression = 'jpeg')
 fig.2.data <- subset(results.long, variable == c('AUROC', 'ACCURACY') & 
                        !(CRITERIA %in% '55 - 70')
                      )
@@ -238,7 +241,8 @@ fig.2 <- ggplot(fig.2.data,
   theme(
     legend.position = 'top'
     , axis.title = element_text(size = 12, color = 'black', family = 'serif')
-    , axis.text = element_text(size = 12, color = 'black', family = 'serif')
+    , axis.text.y = element_text(size = 12, color = 'black', family = 'serif')
+    , axis.text.x = element_text(size = 10, color = 'black', family = 'serif')
     , legend.text = element_text(size = 12, color = 'black', family = 'serif')
     , strip.text = element_text(size = 12, color = 'black', family = 'serif', face = 'bold')
     , legend.title = element_text(size = 12, color = 'black', family = 'serif')
@@ -622,13 +626,15 @@ dev.off()
 ## separate line for each facet
 dummy <- cosine.long %>%
   mutate(
-    intercept = ifelse(sex == "MALE" & (model == "GLM" | model == "RF"), "52",
-                       ifelse(model == "XGB" & sex == "MALE", "51",
-                              ifelse(sex == "FEMALE" & model == "GLM", "53",
-                                     ifelse(sex == "FEMALE" & model == "RF", "52", "54")
-                                     )
+    intercept = ifelse(sex == "MALE" & model == "GLM", "52",
+                       ifelse(sex == "MALE" & model == "RF", "51.95",
+                              ifelse(model == "XGB" & sex == "MALE", "51",
+                                     ifelse(sex == "FEMALE" & model == "GLM", "53",
+                                            ifelse(sex == "FEMALE" & model == "RF", "52.05", "54")
                               )
                        )
+    )
+  )
   )
 ggplot(data = subset(dummy, !(age == '55-70') & !(age == '45')), 
        aes(x = age, y = cosine.lt.vs.ALL, group = sex, color = sex)) +
@@ -702,7 +708,9 @@ p.rf <- ggplot(data = subset(test, model == 'RF'),
     legend.position = 'top'
     , plot.title = element_text(hjust = 0.5,size = 10, color = 'black', family = 'serif', face = 'bold')
     , axis.title = element_blank() 
-    , axis.text = element_text(size = 8, color = 'black', family = 'serif')
+    , axis.ticks.y = element_blank()
+    , axis.text.y = element_blank()
+    , axis.text.x = element_text(size = 8, color = 'black', family = 'serif')
     , legend.text = element_text(size = 10, color = 'black', family = 'serif')
     , strip.text = element_text(size = 10, color = 'black', family = 'serif', face = 'bold')
     , legend.title = element_blank()
@@ -722,7 +730,9 @@ p.XGB <- ggplot(data = subset(test, model == 'XGB'),
     legend.position = 'top'
     , plot.title = element_text(hjust = 0.5,size = 10, color = 'black', family = 'serif', face = 'bold')
     , axis.title = element_blank() 
-    , axis.text = element_text(size = 8, color = 'black', family = 'serif')
+    , axis.text.y = element_blank()
+    , axis.text.x = element_text(size = 8, color = 'black', family = 'serif')
+    , axis.ticks.y = element_blank()
     , legend.text = element_text(size = 10, color = 'black', family = 'serif')
     , strip.text = element_text(size = 10, color = 'black', family = 'serif', face = 'bold')
     , legend.title = element_blank()
@@ -741,7 +751,7 @@ legend_b <- get_legend(
     theme(legend.position = "top"
           , legend.text = element_text(size = 10, color = 'black', family = 'serif', face = "bold"))
 )
-tiff('fig.1.tiff', units = "in", width = 10, height = 6, res = 300, compression = 'jpeg')
+tiff('fig.1.tiff', units = "in", width = 12, height = 6, res = 300, compression = 'jpeg')
 ggdraw(
   add_sub(
     plot_grid(legend_b, p, ncol = 1, rel_heights = c(.05, 1)
@@ -749,4 +759,112 @@ ggdraw(
     , "Age at Index Ischemic Stroke", fontfamily = "serif", size = 10, color = "black"
     , vpadding=grid::unit(0,"lines"),y= 4.75, x=0.5, vjust=4.5)
 )
+dev.off()
+
+
+#-------------
+# generate trends of vars
+#--------------
+tmp_dat <- read_excel("~/Clare-Clustering/figuresCode/latest_figuresData.xlsx"
+                      , sheet = 'tmp'
+                      , na=c("NA")
+                      , col_names = TRUE) 
+tmp_dat <- subset(tmp_dat,
+                  !(vars %in% c('n','label'))
+                  & !(age %in% c('between 55 & 70')) 
+                  )
+tmp_dat$SEX <- factor(tmp_dat$SEX)
+tiff('fig.4.tiff', units = "in", width = 24, height = 4, res = 300, compression = 'jpeg')
+ggplot(tmp_dat, aes(x = age, y = perc, group = 1)) +
+  geom_line() +
+  facet_grid(SEX ~ vars) +
+  theme(
+    axis.text.x = element_text(size = 6, angle = 45)
+    , strip.text.x = element_text(size = 6)
+  )
+dev.off()
+
+tmp_dat %>%
+  ggplot(aes(x = age, y = perc, group = vars, color = vars)) +
+  geom_line() +
+  facet_grid(.~SEX)
+
+# UP vars
+UP <- c(
+  'AFIB_FLUTTER_AT_INDEX_3monthsPost',
+  'CHF_AT_INDEX',
+  'DIABETES_AT_INDEX',
+  'DYSLIPIDEMIA_AT_INDEX',
+  'HYPERTENSION_AT_INDEX_3monthsPost',
+  'MI_AT_INDEX',
+  'NEOPLASM_AT_INDEX',
+  'OTHER_CHRONIC_SYSTEMIC_DISORDERS',
+  'PERI_VASC_DIS_AT_INDEX',
+  'RHEUM_AT_INDEX_3monthsPost',
+  'OTHER_ARTERIOPATHIES '
+)
+DOWN <- c(
+  'ALCOHOL_DEP_ABUSE_AT_INDEX',
+  'ANXIETY_DIS_AT_INDEX',
+  'DRUG_DEP_ABUSE_AT_INDEX',
+  'FAM_HIST',
+  'HYPERCOAG_STATES_AT_INDEX_3monthsPost',
+  'MIGRAINE_AT_INDEX',
+  'MOOD_DISORDER',
+  'PFO_ALL_TIME',
+  'CERVICOCEPHALIC_ARTERIAL_DISSECTION_AT_INDEX',
+  'TEMPORAL_ARTERITIS_3monthsPost'
+)
+fig.5.UP <- subset(tmp_dat, vars %in% UP) %>%
+  ggplot(aes(x = age, y = perc, group = abbr, color = abbr)) +
+  geom_line(size = 1.0) + geom_point(aes(shape = abbr), size = 1.5) +
+  theme_bw() +
+ # geom_rect(aes(fill = SEX),
+ #            xmin = -Inf, xmax = Inf,
+ #            ymin = -Inf, ymax = Inf, alpha = 0.00589, show.legend = FALSE
+ # ) +
+  facet_grid(. ~SEX) +
+  theme(
+    legend.position = "top"
+    , legend.title = element_blank()
+    , axis.title = element_blank()
+    , axis.text.x = element_blank()
+    , axis.ticks.x = element_blank()
+    , legend.background = element_blank()
+    , legend.box.background = element_rect(colour = "black")
+    , strip.text = element_text(face = "bold")
+  ) +
+  scale_shape_manual(values=c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 19))
+fig.5.DOWN <- subset(tmp_dat, vars %in% DOWN) %>%
+  ggplot(aes(x = age, y = perc, group = abbr, color = abbr)) +
+  geom_line(size = 1.0) + geom_point(aes(shape = abbr), size = 1.5) +
+  theme_bw() +
+ # geom_rect(aes(fill = SEX),
+ #          xmin = -Inf, xmax = Inf,
+ #         ymin = -Inf, ymax = Inf, alpha = 0.00589, show.legend = FALSE
+ # ) +
+  facet_grid(. ~SEX) +
+  theme(
+    legend.position = "top"
+    , legend.title = element_blank()
+    , axis.title = element_blank()
+    , legend.background = element_blank()
+    , legend.box.background = element_rect(colour = "black")
+    , strip.text = element_text(face = "bold")
+  ) +
+  scale_shape_manual(values=c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 19))
+  
+plot.5 <- plot_grid(
+  fig.5.UP, fig.5.DOWN
+  , ncol = 1, labels = c('A', 'B')
+)
+y.grob <- textGrob("Percentage of Ischemic Stroke Patients", 
+                   gp=gpar(fontface="bold", col="black", fontsize=13), rot=90)
+
+x.grob <- textGrob("Age at Ischemic Stroke Index", 
+                   gp=gpar(fontface="bold", col="black", fontsize=12))
+
+#add to plot
+tiff('fig.4.tiff', units = "in", width = 10, height = 10, res = 300, compression = 'jpeg')
+grid.arrange(arrangeGrob(plot.5, left = y.grob, bottom = x.grob))
 dev.off()
